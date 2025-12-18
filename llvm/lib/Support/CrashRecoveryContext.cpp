@@ -14,8 +14,12 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/thread.h"
 #include <cassert>
+#if LLVM_ENABLE_THREADS
 #include <mutex>
+#endif
+#if HAVE_SETJMP
 #include <setjmp.h>
+#endif
 
 using namespace llvm;
 
@@ -32,7 +36,9 @@ struct CrashRecoveryContextImpl {
   const CrashRecoveryContextImpl *Next;
 
   CrashRecoveryContext *CRC;
+#if HAVE_SETJMP
   ::jmp_buf JumpBuffer;
+#endif
   volatile unsigned Failed : 1;
   unsigned SwitchedThread : 1;
   unsigned ValidJumpBuffer : 1;
@@ -51,7 +57,7 @@ public:
   /// Called when the separate crash-recovery thread was finished, to
   /// indicate that we don't need to clear the thread-local CurrentContext.
   void setSwitchedThread() {
-#if defined(LLVM_ENABLE_THREADS) && LLVM_ENABLE_THREADS != 0
+#if LLVM_ENABLE_THREADS
     SwitchedThread = true;
 #endif
   }
@@ -73,19 +79,23 @@ public:
 
     CRC->RetCode = RetCode;
 
+#if HAVE_SETJMP
     // Jump back to the RunSafely we were called under.
     if (ValidJumpBuffer)
       longjmp(JumpBuffer, 1);
+#endif
 
     // Otherwise let the caller decide of the outcome of the crash. Currently
     // this occurs when using SEH on Windows with MSVC or clang-cl.
   }
 };
 
+#if LLVM_ENABLE_THREADS
 std::mutex &getCrashRecoveryContextMutex() {
   static std::mutex CrashRecoveryContextMutex;
   return CrashRecoveryContextMutex;
 }
+#endif
 
 static bool gCrashRecoveryEnabled = false;
 
@@ -139,7 +149,9 @@ CrashRecoveryContext *CrashRecoveryContext::GetCurrent() {
 }
 
 void CrashRecoveryContext::Enable() {
+#if LLVM_ENABLE_THREADS
   std::lock_guard<std::mutex> L(getCrashRecoveryContextMutex());
+#endif
   // FIXME: Shouldn't this be a refcount or something?
   if (gCrashRecoveryEnabled)
     return;
@@ -148,7 +160,9 @@ void CrashRecoveryContext::Enable() {
 }
 
 void CrashRecoveryContext::Disable() {
+#if LLVM_ENABLE_THREADS
   std::lock_guard<std::mutex> L(getCrashRecoveryContextMutex());
+#endif
   if (!gCrashRecoveryEnabled)
     return;
   gCrashRecoveryEnabled = false;
@@ -339,7 +353,14 @@ static void uninstallExceptionOrSignalHandlers() {
 static void installExceptionOrSignalHandlers() {}
 static void uninstallExceptionOrSignalHandlers() {}
 
-#else // !_WIN32 && !__wasi__
+#elif !LLVM_ENABLE_THREADS
+
+// Threads are disabled, so we can't use signal handlers. Do nothing.
+
+static void installExceptionOrSignalHandlers() {}
+static void uninstallExceptionOrSignalHandlers() {}
+
+#else // !_WIN32 && !__wasi__ && LLVM_ENABLE_THREADS
 
 // Generic POSIX implementation.
 //

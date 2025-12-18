@@ -28,7 +28,10 @@
 #endif
 
 #include <dirent.h>
+
+#if !defined(__wasi__)
 #include <pwd.h>
+#endif
 
 #ifdef __APPLE__
 #include <copyfile.h>
@@ -127,7 +130,7 @@ const file_t kInvalidFile = -1;
     defined(__CYGWIN__) || defined(__DragonFly__) || defined(_AIX) ||          \
     defined(__GNU__) ||                                                        \
     (defined(__sun__) && defined(__svr4__) || defined(__HAIKU__)) ||           \
-    defined(__managarm__)
+    defined(__managarm__) || defined(__wasi__)
 static int test_dir(char ret[PATH_MAX], const char *dir, const char *bin) {
   struct stat sb;
   char fullpath[PATH_MAX];
