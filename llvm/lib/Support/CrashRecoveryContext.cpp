@@ -330,7 +330,16 @@ static void uninstallExceptionOrSignalHandlers() {
   }
 }
 
-#else // !_WIN32
+#elif defined(__wasi__)
+
+// WASI implementation.
+//
+// WASI traps are always fatal, and recovery is not possible. Do nothing.
+
+static void installExceptionOrSignalHandlers() {}
+static void uninstallExceptionOrSignalHandlers() {}
+
+#else // !_WIN32 && !__wasi__
 
 // Generic POSIX implementation.
 //
