@@ -1350,6 +1350,7 @@ namespace path {
 bool home_directory(SmallVectorImpl<char> &result) {
   std::unique_ptr<char[]> Buf;
   char *RequestedDir = getenv("HOME");
+#if !defined(__wasi__)
   if (!RequestedDir) {
     long BufSize = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (BufSize <= 0)
@@ -1361,6 +1362,7 @@ bool home_directory(SmallVectorImpl<char> &result) {
     if (pw && pw->pw_dir)
       RequestedDir = pw->pw_dir;
   }
+#endif
   if (!RequestedDir)
     return false;
 

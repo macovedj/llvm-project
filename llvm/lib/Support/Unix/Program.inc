@@ -257,6 +257,9 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
   }
 #endif // HAVE_POSIX_SPAWN
 
+#if defined(__wasi__)
+  return !MakeErrMsg(ErrMsg, "fork/exec not supported on WASI");
+#else
   // Create a child process.
   int child = fork();
   switch (child) {
@@ -330,6 +333,7 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
   PI.Process = child;
 
   return true;
+#endif // !defined(__wasi__)
 }
 
 namespace llvm {
@@ -337,7 +341,7 @@ namespace sys {
 
 #if defined(_AIX)
 static pid_t(wait4)(pid_t pid, int *status, int options, struct rusage *usage);
-#elif !defined(__Fuchsia__)
+#elif !defined(__Fuchsia__) && !defined(__wasi__)
 using ::wait4;
 #endif
 

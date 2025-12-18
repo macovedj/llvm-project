@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Config/config.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ExitCodes.h"
@@ -417,10 +418,12 @@ bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
     CrashRecoveryContextImpl *CRCI = new CrashRecoveryContextImpl(this);
     Impl = CRCI;
 
+#if HAVE_SETJMP
     CRCI->ValidJumpBuffer = true;
     if (setjmp(CRCI->JumpBuffer) != 0) {
       return false;
     }
+#endif
   }
 
   Fn();
@@ -467,7 +470,9 @@ bool CrashRecoveryContext::isCrash(int RetCode) {
 bool CrashRecoveryContext::throwIfCrash(int RetCode) {
   if (!isCrash(RetCode))
     return false;
-#if defined(_WIN32)
+#if defined(__wasi__)
+  abort();
+#elif defined(_WIN32)
   ::RaiseException(RetCode, 0, 0, NULL);
 #else
   llvm::sys::unregisterHandlers();

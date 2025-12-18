@@ -20,11 +20,11 @@
 #include <fcntl.h>
 #include <functional>
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__wasi__)
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#else
+#elif defined(_WIN32)
 #include "llvm/Support/Windows/WindowsSupport.h"
 // winsock2.h must be included before afunix.h. Briefly turn off clang-format to
 // avoid error.

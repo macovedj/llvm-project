@@ -34,7 +34,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cmath>
+#if !defined(__wasi__)
 #include <csignal>
+#endif
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
