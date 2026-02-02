@@ -341,8 +341,11 @@ static GenericValue lle_X_exit(FunctionType *FT, ArrayRef<GenericValue> Args) {
 // void abort(void)
 static GenericValue lle_X_abort(FunctionType *FT, ArrayRef<GenericValue> Args) {
   //FIXME: should we report or raise here?
-  //report_fatal_error("Interpreted program raised SIGABRT");
+#if defined(__wasi__)
+  report_fatal_error("Interpreted program raised SIGABRT");
+#else
   raise (SIGABRT);
+#endif
   return GenericValue();
 }
 
