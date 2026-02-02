@@ -336,6 +336,9 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
   char link_path[PATH_MAX];
   if (realpath(DLInfo.dli_fname, link_path))
     return link_path;
+#elif defined(__wasi__)
+  return "";
+
 #else
 #error GetMainExecutable is not implemented on this host yet.
 #endif
@@ -558,6 +561,9 @@ static bool is_local_impl(struct STATVFS &Vfs) {
   // The file system can have an arbitrary structure on z/OS; must go with the
   // conservative answer.
   return false;
+#elif defined(__wasi__)
+  return false;
+
 #else
   return !!(STATVFS_F_FLAG(Vfs) & MNT_LOCAL);
 #endif
@@ -676,6 +682,7 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
     return;
   }
 
+#if !defined(__wasi__)
   // This is a string of the form ~username/, look up this user's entry in the
   // password database.
   std::unique_ptr<char[]> Buf;
@@ -699,6 +706,10 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
   llvm::sys::path::append(Path, Storage);
 }
 
+#else
+  // WASI does not support password database
+  return;
+#endif
 void expand_tilde(const Twine &path, SmallVectorImpl<char> &dest) {
   dest.clear();
   if (path.isTriviallyEmpty())
@@ -775,6 +786,9 @@ std::error_code status(int FD, file_status &Result) {
 unsigned getUmask() {
   // Chose arbitary new mask and reset the umask to the old mask.
   // umask(2) never fails so ignore the return of the second call.
+#if defined(__wasi__)
+  return 022; // Default umask for WASI
+#endif
   unsigned Mask = ::umask(0);
   (void)::umask(Mask);
   return Mask;
@@ -1229,6 +1243,9 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
 
 std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
   auto Start = std::chrono::steady_clock::now();
+#if defined(__wasi__)
+  return std::error_code(); // No-op on WASI
+#endif
   auto End = Start + Timeout;
   do {
     struct flock Lock;
@@ -1249,6 +1266,10 @@ std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
 
 std::error_code lockFile(int FD) {
   struct flock Lock;
+#if defined(__wasi__)
+  return std::error_code(); // No-op on WASI
+#endif
+
   memset(&Lock, 0, sizeof(Lock));
   Lock.l_type = F_WRLCK;
   Lock.l_whence = SEEK_SET;
@@ -1261,6 +1282,10 @@ std::error_code lockFile(int FD) {
 
 std::error_code unlockFile(int FD) {
   struct flock Lock;
+#if defined(__wasi__)
+  return std::error_code(); // No-op on WASI
+#endif
+
   Lock.l_type = F_UNLCK;
   Lock.l_whence = SEEK_SET;
   Lock.l_start = 0;
@@ -1340,6 +1365,10 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
 
 std::error_code changeFileOwnership(int FD, uint32_t Owner, uint32_t Group) {
   auto FChown = [&]() { return ::fchown(FD, Owner, Group); };
+#if defined(__wasi__)
+  return std::error_code(); // No-op on WASI
+#endif
+
   // Retry if fchown call fails due to interruption.
   if ((sys::RetryAfterSignal(-1, FChown)) < 0)
     return errnoAsErrorCode();

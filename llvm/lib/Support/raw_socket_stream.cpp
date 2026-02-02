@@ -116,6 +116,30 @@ ListeningSocket::ListeningSocket(ListeningSocket &&LS)
   LS.PipeFD[1] = -1;
 }
 
+// WASI stub implementations - sockets not supported
+#if defined(__wasi__)
+Expected<ListeningSocket>
+ListeningSocket::createUnix(StringRef SocketPath, int MaxBacklog) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+
+Expected<std::unique_ptr<raw_socket_stream>>
+ListeningSocket::accept(const std::chrono::milliseconds &Timeout) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+
+Expected<std::unique_ptr<raw_socket_stream>>
+raw_socket_stream::createConnectedUnix(StringRef SocketPath) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+#else
+
 Expected<ListeningSocket> ListeningSocket::createUnix(StringRef SocketPath,
                                                       int MaxBacklog) {
 
@@ -356,3 +380,4 @@ ssize_t raw_socket_stream::read(char *Ptr, size_t Size,
   }
   return raw_fd_stream::read(Ptr, Size);
 }
+#endif // !defined(__wasi__)

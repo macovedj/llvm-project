@@ -141,6 +141,9 @@ void Process::GetTimeUsage(TimePoint<> &elapsed,
 // does what's necessary to prevent their generation.
 void Process::PreventCoreFiles() {
   struct rlimit rlim;
+#if defined(__wasi__)
+  return; // No core files on WASI
+#endif
   getrlimit(RLIMIT_CORE, &rlim);
 #ifdef __linux__
   // On Linux, if the kernel.core_pattern sysctl starts with a '|' (i.e. it
@@ -223,6 +226,9 @@ private:
 
 std::error_code Process::FixupStandardFileDescriptors() {
   int NullFD = -1;
+#if defined(__wasi__)
+  return std::error_code(); // No-op on WASI
+#endif
   FDCloser FDC(NullFD);
   const int StandardFDs[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
   for (int StandardFD : StandardFDs) {
@@ -257,6 +263,10 @@ std::error_code Process::FixupStandardFileDescriptors() {
 
 std::error_code Process::SafelyCloseFileDescriptor(int FD) {
   // Create a signal set filled with *all* signals.
+#if defined(__wasi__)
+  return close(FD) == -1 ? errnoAsErrorCode() : std::error_code();
+#endif
+
   sigset_t FullSet, SavedSet;
   if (sigfillset(&FullSet) < 0 || sigfillset(&SavedSet) < 0)
     return errnoAsErrorCode();
@@ -324,7 +334,7 @@ static unsigned getColumns(int FileID) {
   // instead if it isn't available.
   unsigned Columns = 0;
 
-#if defined(HAVE_SYS_IOCTL_H) && !defined(__sun__)
+#if defined(HAVE_SYS_IOCTL_H) && !defined(__sun__) && !defined(__wasi__)
   struct winsize ws;
   if (ioctl(FileID, TIOCGWINSZ, &ws) == 0)
     Columns = ws.ws_col;

@@ -32,6 +32,33 @@
 //
 //===----------------------------------------------------------------------===//
 
+// WASI stub implementations - signals not supported
+#if defined(__wasi__)
+
+void llvm::sys::RunInterruptHandlers() {}
+
+bool llvm::sys::RemoveFileOnSignal(StringRef Filename, std::string *ErrMsg) {
+  return false;
+}
+
+void llvm::sys::DontRemoveFileOnSignal(StringRef Filename) {}
+
+void llvm::sys::AddSignalHandler(sys::SignalHandlerCallback, void *) {}
+
+void llvm::sys::SetInterruptFunction(void (*IF)()) {}
+void llvm::sys::SetInfoSignalFunction(void (*Handler)()) {}
+void llvm::sys::SetOneShotPipeSignalFunction(void (*Handler)()) {}
+void llvm::sys::DefaultOneShotPipeSignalHandler() {}
+
+void llvm::sys::CleanupOnSignal(uintptr_t) {}
+void llvm::sys::unregisterHandlers() {}
+
+void llvm::sys::PrintStackTrace(raw_ostream &) {}
+void llvm::sys::RunSignalHandlers() {}
+void llvm::sys::DisableSystemDialogsOnCrash() {}
+
+#else // !defined(__wasi__)
+
 #include "Unix.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Config/config.h"
@@ -941,3 +968,4 @@ void llvm::sys::PrintStackTraceOnErrorSignal(StringRef Argv0,
   }
 #endif
 }
+#endif // !defined(__wasi__)

@@ -88,6 +88,7 @@ ErrorOr<std::string> sys::findProgramByName(StringRef Name,
   return errc::no_such_file_or_directory;
 }
 
+#if !defined(__wasi__)
 static bool RedirectIO(std::optional<StringRef> Path, int FD, std::string *ErrMsg) {
   if (!Path) // Noop
     return false;
@@ -162,6 +163,7 @@ toNullTerminatedCStringArray(ArrayRef<StringRef> Strings, StringSaver &Saver) {
   return Result;
 }
 
+#endif // !defined(__wasi__)
 static bool Execute(ProcessInfo &PI, StringRef Program,
                     ArrayRef<StringRef> Args,
                     std::optional<ArrayRef<StringRef>> Env,
@@ -382,6 +384,20 @@ pid_t(llvm::sys::wait4)(pid_t pid, int *status, int options,
 }
 #endif
 
+#if defined(__wasi__)
+ProcessInfo llvm::sys::Wait(const ProcessInfo &PI,
+                            std::optional<unsigned> SecondsToWait,
+                            std::string *ErrMsg,
+                            std::optional<ProcessStatistics> *ProcStat,
+                            bool Polling) {
+  if (ErrMsg)
+    *ErrMsg = "Wait not supported on WASI";
+  ProcessInfo Result;
+  Result.Pid = PI.Pid;
+  Result.ReturnCode = -1;
+  return Result;
+}
+#else
 ProcessInfo llvm::sys::Wait(const ProcessInfo &PI,
                             std::optional<unsigned> SecondsToWait,
                             std::string *ErrMsg,
@@ -506,6 +522,7 @@ ProcessInfo llvm::sys::Wait(const ProcessInfo &PI,
   return WaitResult;
 }
 
+#endif // !defined(__wasi__)
 std::error_code llvm::sys::ChangeStdinMode(fs::OpenFlags Flags) {
   if (!(Flags & fs::OF_Text))
     return ChangeStdinToBinary();
