@@ -154,6 +154,8 @@ static void SetMemoryLimits(unsigned size) {
 #endif
 }
 
+#endif // !defined(__wasi__)
+
 static std::vector<const char *>
 toNullTerminatedCStringArray(ArrayRef<StringRef> Strings, StringSaver &Saver) {
   std::vector<const char *> Result;
@@ -163,7 +165,6 @@ toNullTerminatedCStringArray(ArrayRef<StringRef> Strings, StringSaver &Saver) {
   return Result;
 }
 
-#endif // !defined(__wasi__)
 static bool Execute(ProcessInfo &PI, StringRef Program,
                     ArrayRef<StringRef> Args,
                     std::optional<ArrayRef<StringRef>> Env,

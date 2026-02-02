@@ -704,12 +704,13 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
   Path.clear();
   Path.append(Entry->pw_dir, Entry->pw_dir + strlen(Entry->pw_dir));
   llvm::sys::path::append(Path, Storage);
+#else
+  // WASI does not support password database, just return original path
+  (void)Remainder;
+  (void)Storage;
+#endif
 }
 
-#else
-  // WASI does not support password database
-  return;
-#endif
 void expand_tilde(const Twine &path, SmallVectorImpl<char> &dest) {
   dest.clear();
   if (path.isTriviallyEmpty())

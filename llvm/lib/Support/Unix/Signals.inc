@@ -35,6 +35,8 @@
 // WASI stub implementations - signals not supported
 #if defined(__wasi__)
 
+#include "llvm/Support/raw_ostream.h"
+
 void llvm::sys::RunInterruptHandlers() {}
 
 bool llvm::sys::RemoveFileOnSignal(StringRef Filename, std::string *ErrMsg) {
@@ -53,9 +55,12 @@ void llvm::sys::DefaultOneShotPipeSignalHandler() {}
 void llvm::sys::CleanupOnSignal(uintptr_t) {}
 void llvm::sys::unregisterHandlers() {}
 
-void llvm::sys::PrintStackTrace(raw_ostream &) {}
-void llvm::sys::RunSignalHandlers() {}
+// Note: PrintStackTrace and RunSignalHandlers are defined in Signals.cpp
+// PrintStackTrace calls into this file, but we provide empty implementation
+void llvm::sys::PrintStackTrace(raw_ostream &OS, int Depth) {}
 void llvm::sys::DisableSystemDialogsOnCrash() {}
+void llvm::sys::PrintStackTraceOnErrorSignal(StringRef Argv0,
+                                             bool DisableCrashReporting) {}
 
 #else // !defined(__wasi__)
 

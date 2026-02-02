@@ -53,6 +53,59 @@ WSABalancer::WSABalancer() {
 WSABalancer::~WSABalancer() { WSACleanup(); }
 #endif // _WIN32
 
+// Common constructors - no socket-specific code
+ListeningSocket::ListeningSocket(int SocketFD, StringRef SocketPath,
+                                 int PipeFD[2])
+    : FD(SocketFD), SocketPath(SocketPath), PipeFD{PipeFD[0], PipeFD[1]} {}
+
+ListeningSocket::ListeningSocket(ListeningSocket &&LS)
+    : FD(LS.FD.load()), SocketPath(LS.SocketPath),
+      PipeFD{LS.PipeFD[0], LS.PipeFD[1]} {
+
+  LS.FD = -1;
+  LS.SocketPath.clear();
+  LS.PipeFD[0] = -1;
+  LS.PipeFD[1] = -1;
+}
+
+// WASI stub implementations - sockets not supported
+#if defined(__wasi__)
+
+Expected<ListeningSocket>
+ListeningSocket::createUnix(StringRef SocketPath, int MaxBacklog) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+
+Expected<std::unique_ptr<raw_socket_stream>>
+ListeningSocket::accept(const std::chrono::milliseconds &Timeout) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+
+Expected<std::unique_ptr<raw_socket_stream>>
+raw_socket_stream::createConnectedUnix(StringRef SocketPath) {
+  return make_error<StringError>(
+      std::make_error_code(std::errc::not_supported),
+      "Unix sockets not supported on WASI");
+}
+
+void ListeningSocket::shutdown() {}
+ListeningSocket::~ListeningSocket() {}
+
+raw_socket_stream::raw_socket_stream(int SocketFD)
+    : raw_fd_stream(SocketFD, true) {}
+raw_socket_stream::~raw_socket_stream() {}
+
+ssize_t raw_socket_stream::read(char *Ptr, size_t Size,
+                                const std::chrono::milliseconds &Timeout) {
+  return -1;
+}
+
+#else // !defined(__wasi__)
+
 static std::error_code getLastSocketErrorCode() {
 #ifdef _WIN32
   return std::error_code(::WSAGetLastError(), std::system_category());
@@ -82,12 +135,6 @@ static Expected<int> getSocketFD(StringRef SocketPath) {
   }
 
 #ifdef __CYGWIN__
-  // On Cygwin, UNIX sockets involve a handshake between connect and accept
-  // to enable SO_PEERCRED/getpeereid handling.  This necessitates accept being
-  // called before connect can return, but at least the tests in
-  // llvm/unittests/Support/raw_socket_stream_test do both on the same thread
-  // (first connect and then accept), resulting in a deadlock.  This call turns
-  // off the handshake (and SO_PEERCRED/getpeereid support).
   setsockopt(Socket, SOL_SOCKET, SO_PEERCRED, NULL, 0);
 #endif
   struct sockaddr_un Addr = setSocketAddr(SocketPath);
@@ -101,44 +148,6 @@ static Expected<int> getSocketFD(StringRef SocketPath) {
   return Socket;
 #endif // _WIN32
 }
-
-ListeningSocket::ListeningSocket(int SocketFD, StringRef SocketPath,
-                                 int PipeFD[2])
-    : FD(SocketFD), SocketPath(SocketPath), PipeFD{PipeFD[0], PipeFD[1]} {}
-
-ListeningSocket::ListeningSocket(ListeningSocket &&LS)
-    : FD(LS.FD.load()), SocketPath(LS.SocketPath),
-      PipeFD{LS.PipeFD[0], LS.PipeFD[1]} {
-
-  LS.FD = -1;
-  LS.SocketPath.clear();
-  LS.PipeFD[0] = -1;
-  LS.PipeFD[1] = -1;
-}
-
-// WASI stub implementations - sockets not supported
-#if defined(__wasi__)
-Expected<ListeningSocket>
-ListeningSocket::createUnix(StringRef SocketPath, int MaxBacklog) {
-  return make_error<StringError>(
-      std::make_error_code(std::errc::not_supported),
-      "Unix sockets not supported on WASI");
-}
-
-Expected<std::unique_ptr<raw_socket_stream>>
-ListeningSocket::accept(const std::chrono::milliseconds &Timeout) {
-  return make_error<StringError>(
-      std::make_error_code(std::errc::not_supported),
-      "Unix sockets not supported on WASI");
-}
-
-Expected<std::unique_ptr<raw_socket_stream>>
-raw_socket_stream::createConnectedUnix(StringRef SocketPath) {
-  return make_error<StringError>(
-      std::make_error_code(std::errc::not_supported),
-      "Unix sockets not supported on WASI");
-}
-#else
 
 Expected<ListeningSocket> ListeningSocket::createUnix(StringRef SocketPath,
                                                       int MaxBacklog) {

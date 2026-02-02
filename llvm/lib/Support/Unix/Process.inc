@@ -140,10 +140,11 @@ void Process::GetTimeUsage(TimePoint<> &elapsed,
 // their operation. To prevent the disk from filling up, this function
 // does what's necessary to prevent their generation.
 void Process::PreventCoreFiles() {
-  struct rlimit rlim;
 #if defined(__wasi__)
+  coreFilesPrevented = true;
   return; // No core files on WASI
 #endif
+  struct rlimit rlim;
   getrlimit(RLIMIT_CORE, &rlim);
 #ifdef __linux__
   // On Linux, if the kernel.core_pattern sysctl starts with a '|' (i.e. it
