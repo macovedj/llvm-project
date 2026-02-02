@@ -789,10 +789,11 @@ unsigned getUmask() {
   // umask(2) never fails so ignore the return of the second call.
 #if defined(__wasi__)
   return 022; // Default umask for WASI
-#endif
+#else
   unsigned Mask = ::umask(0);
   (void)::umask(Mask);
   return Mask;
+#endif
 }
 
 std::error_code setPermissions(const Twine &Path, perms Permissions) {
@@ -1243,10 +1244,10 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
 }
 
 std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
-  auto Start = std::chrono::steady_clock::now();
 #if defined(__wasi__)
   return std::error_code(); // No-op on WASI
-#endif
+#else
+  auto Start = std::chrono::steady_clock::now();
   auto End = Start + Timeout;
   do {
     struct flock Lock;
@@ -1263,14 +1264,14 @@ std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
     usleep(1000);
   } while (std::chrono::steady_clock::now() < End);
   return make_error_code(errc::no_lock_available);
+#endif
 }
 
 std::error_code lockFile(int FD) {
-  struct flock Lock;
 #if defined(__wasi__)
   return std::error_code(); // No-op on WASI
-#endif
-
+#else
+  struct flock Lock;
   memset(&Lock, 0, sizeof(Lock));
   Lock.l_type = F_WRLCK;
   Lock.l_whence = SEEK_SET;
@@ -1279,14 +1280,14 @@ std::error_code lockFile(int FD) {
   if (::fcntl(FD, F_SETLKW, &Lock) != -1)
     return std::error_code();
   return errnoAsErrorCode();
+#endif
 }
 
 std::error_code unlockFile(int FD) {
-  struct flock Lock;
 #if defined(__wasi__)
   return std::error_code(); // No-op on WASI
-#endif
-
+#else
+  struct flock Lock;
   Lock.l_type = F_UNLCK;
   Lock.l_whence = SEEK_SET;
   Lock.l_start = 0;
@@ -1294,6 +1295,7 @@ std::error_code unlockFile(int FD) {
   if (::fcntl(FD, F_SETLK, &Lock) != -1)
     return std::error_code();
   return errnoAsErrorCode();
+#endif
 }
 
 std::error_code closeFile(file_t &F) {
@@ -1365,15 +1367,15 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
 }
 
 std::error_code changeFileOwnership(int FD, uint32_t Owner, uint32_t Group) {
-  auto FChown = [&]() { return ::fchown(FD, Owner, Group); };
 #if defined(__wasi__)
   return std::error_code(); // No-op on WASI
-#endif
-
+#else
+  auto FChown = [&]() { return ::fchown(FD, Owner, Group); };
   // Retry if fchown call fails due to interruption.
   if ((sys::RetryAfterSignal(-1, FChown)) < 0)
     return errnoAsErrorCode();
   return std::error_code();
+#endif
 }
 
 } // end namespace fs

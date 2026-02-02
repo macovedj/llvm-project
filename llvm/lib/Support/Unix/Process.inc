@@ -143,7 +143,7 @@ void Process::PreventCoreFiles() {
 #if defined(__wasi__)
   coreFilesPrevented = true;
   return; // No core files on WASI
-#endif
+#else
   struct rlimit rlim;
   getrlimit(RLIMIT_CORE, &rlim);
 #ifdef __linux__
@@ -196,6 +196,7 @@ void Process::PreventCoreFiles() {
 #endif
 
   coreFilesPrevented = true;
+#endif // !defined(__wasi__)
 }
 
 std::optional<std::string> Process::GetEnv(StringRef Name) {
@@ -226,10 +227,10 @@ private:
 } // namespace
 
 std::error_code Process::FixupStandardFileDescriptors() {
-  int NullFD = -1;
 #if defined(__wasi__)
   return std::error_code(); // No-op on WASI
-#endif
+#else
+  int NullFD = -1;
   FDCloser FDC(NullFD);
   const int StandardFDs[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
   for (int StandardFD : StandardFDs) {
@@ -260,14 +261,14 @@ std::error_code Process::FixupStandardFileDescriptors() {
       return errnoAsErrorCode();
   }
   return std::error_code();
+#endif // !defined(__wasi__)
 }
 
 std::error_code Process::SafelyCloseFileDescriptor(int FD) {
-  // Create a signal set filled with *all* signals.
 #if defined(__wasi__)
   return close(FD) == -1 ? errnoAsErrorCode() : std::error_code();
-#endif
-
+#else
+  // Create a signal set filled with *all* signals.
   sigset_t FullSet, SavedSet;
   if (sigfillset(&FullSet) < 0 || sigfillset(&SavedSet) < 0)
     return errnoAsErrorCode();
@@ -299,6 +300,7 @@ std::error_code Process::SafelyCloseFileDescriptor(int FD) {
   if (ErrnoFromClose)
     return std::error_code(ErrnoFromClose, std::generic_category());
   return std::error_code(EC, std::generic_category());
+#endif // !defined(__wasi__)
 }
 
 bool Process::StandardInIsUserInput() {
